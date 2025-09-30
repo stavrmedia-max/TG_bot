@@ -16,6 +16,28 @@ dp = Dispatcher()
 async def send_welcome(message: types.Message):
     await message.reply("Привет! Я твой бот (webhook).")
 
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram import F
+
+# --- Кнопка ---
+kb = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="Есть ли жизнь на Марсе?")]
+    ],
+    resize_keyboard=True
+)
+
+# --- Ответ на кнопку ---
+@dp.message(F.text == "Есть ли жизнь на Марсе?")
+async def mars_answer(message: types.Message):
+    await message.answer("И там её нет...")
+
+# --- Обновляем /start ---
+@dp.message(F.text == "/start")
+async def send_welcome(message: types.Message):
+    await message.answer("Привет! Я твой бот. Жми кнопку 👇", reply_markup=kb)
+
+
 @dp.message()
 async def echo(message: types.Message):
     await message.answer(message.text)
