@@ -1,1 +1,2 @@
-worker: python bot4.ru
+web: python bot4.ru
+
