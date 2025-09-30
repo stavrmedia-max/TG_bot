@@ -1,49 +1,57 @@
-import asyncio
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 import os
+import asyncio
+from aiohttp import web
+from aiogram import Bot, Dispatcher, types, F
 
+# токен берём из переменной окружения
 API_TOKEN = os.getenv("API_TOKEN")
+
+# Render даёт ссылку на сервис (переменная RENDER_EXTERNAL_URL)
+WEBHOOK_HOST = os.getenv("RENDER_EXTERNAL_URL")
+WEBHOOK_PATH = "/webhook"
+WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 
-# Клавиатура
-kb = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton(text="Есть ли жизнь на Марсе?")],
-        [KeyboardButton(text="Привет"), KeyboardButton(text="Помощь")]
-    ],
-    resize_keyboard=True
-)
 
-# Ответ на /start
-@dp.message(F.text == "/start")
+# --- handlers ---
+@dp.message(F.text.in_(['/start', '/help']))
 async def send_welcome(message: types.Message):
-    await message.reply("Привет! Я твой бот 🤖.\nВыбирай кнопку ниже:", reply_markup=kb)
+    await message.reply("Привет! Я твой бот.")
 
-# Ответ на кнопку "Есть ли жизнь на Марсе?"
-@dp.message(F.text == "Есть ли жизнь на Марсе?")
-async def mars_answer(message: types.Message):
-    await message.reply("И там её нет...")
 
-# Ответ на кнопку "Привет"
-@dp.message(F.text == "Привет")
-async def hello_answer(message: types.Message):
-    await message.reply("Привет, человек! 👋")
-
-# Ответ на кнопку "Помощь"
-@dp.message(F.text == "Помощь")
-async def help_answer(message: types.Message):
-    await message.reply("Я пока умею отвечать на простые вопросы.\nДоступные кнопки: Марс, Привет, Помощь.")
-
-# Эхо-функция для остальных сообщений
 @dp.message()
 async def echo(message: types.Message):
-    await message.answer(message.text)
+    # пример кастомного ответа
+    if message.text.lower() == "есть ли жизнь на марсе?":
+        await message.answer("И там её нет...")
+    else:
+        await message.answer(message.text)
 
-async def main():
-    await dp.start_polling(bot)
+
+# --- webhook logic ---
+async def on_startup(app):
+    await bot.set_webhook(WEBHOOK_URL)
+
+
+async def on_shutdown(app):
+    await bot.delete_webhook()
+
+
+async def handle(request):
+    data = await request.json()
+    update = types.Update(**data)
+    await dp.feed_update(bot, update)
+    return web.Response()
+
+
+# --- aiohttp app ---
+app = web.Application()
+app.router.add_post(WEBHOOK_PATH, handle)
+app.on_startup.append(on_startup)
+app.on_shutdown.append(on_shutdown)
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    web.run_app(app, host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
