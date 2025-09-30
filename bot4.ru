@@ -1,43 +1,41 @@
 import os
+import asyncio
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiohttp import web
 
 API_TOKEN = os.getenv("API_TOKEN")
+WEBHOOK_HOST = os.getenv("RENDER_EXTERNAL_URL")
 WEBHOOK_PATH = "/webhook"
-WEBHOOK_HOST = os.getenv("RENDER_EXTERNAL_URL")  # Render URL (например: https://tg-bot-xxx.onrender.com)
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 
-# --- Главное меню ---
+
+# Главное меню
 def main_menu():
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+    return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Привет 👋", callback_data="hello")],
         [InlineKeyboardButton(text="Помощь ❓", callback_data="help")],
         [InlineKeyboardButton(text="Есть ли жизнь на Марсе? 🚀", callback_data="mars")],
         [InlineKeyboardButton(text="О боте 🤖", callback_data="about")]
     ])
-    return keyboard
 
 
-# --- Вложенное меню "О боте" ---
+# Вложенное меню
 def about_menu():
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+    return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Создатель 👨‍💻", callback_data="creator")],
         [InlineKeyboardButton(text="Назад 🔙", callback_data="back_to_main")]
     ])
-    return keyboard
 
 
-# --- Команда /start ---
 @dp.message(F.text == "/start")
-async def start_handler(message: types.Message):
+async def cmd_start(message: types.Message):
     await message.answer("Главное меню:", reply_markup=main_menu())
 
 
-# --- Обработка кнопок ---
 @dp.callback_query()
 async def handle_menu(callback: types.CallbackQuery):
     if callback.data == "hello":
@@ -52,11 +50,10 @@ async def handle_menu(callback: types.CallbackQuery):
         await callback.message.answer("Создатель: compact 🚀")
     elif callback.data == "back_to_main":
         await callback.message.answer("Возвращаюсь в главное меню:", reply_markup=main_menu())
+    await callback.answer()
 
-    await callback.answer()  # убираем "часики" у кнопки
 
-
-# --- Webhook ---
+# --- webhook сервер ---
 async def on_startup(app):
     await bot.set_webhook(WEBHOOK_URL)
 
@@ -65,9 +62,9 @@ async def on_shutdown(app):
     await bot.delete_webhook()
 
 
-async def handle(request):
+async def handle(request: web.Request):
     data = await request.json()
-    update = types.Update(**data)
+    update = types.Update.model_validate(data)
     await dp.feed_update(bot, update)
     return web.Response()
 
